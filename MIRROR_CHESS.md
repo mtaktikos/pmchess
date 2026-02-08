@@ -11,6 +11,7 @@ A mirror square is clock-symmetric to the original square on an 8x8 board (180-d
   - mirror(e4) = d5  
   - mirror(b3) = g6
   - mirror(e2) = d7
+  - mirror(d4) = e5
 
 ## Rules
 1. When a piece makes a **non-capture** move and lands on a square:
@@ -18,62 +19,132 @@ A mirror square is clock-symmetric to the original square on an 8x8 board (180-d
    - **If the mirror square is empty**: A piece of the same type in the **opponent's color** appears on the mirror square
 
 2. All other chess rules remain unchanged:
-   - Castling works normally
-   - En passant works normally  
+   - Castling works normally (but doesn't create mirror pieces)
+   - En passant works normally (doesn't create mirror pieces - it's a capture)
    - Pawn promotion works normally
    - Check and checkmate work normally
    - Capture moves do NOT create mirror pieces
+
+## Examples
+
+### Example 1: Opening Move
+1. White plays **e2-e4** 
+   - e2 is empty (non-capture) ✓
+   - Mirror of e4 is d5
+   - d5 is empty ✓  
+   - **Result**: White pawn on e4, Black pawn appears on d5
+
+### Example 2: Mirror Occupied
+2. Black plays **d7-d5**
+   - d7 is empty (non-capture) ✓
+   - d5 is already occupied (from example 1) 
+   - **Result**: Black pawn on d5, no mirror piece created (normal chess move)
+
+### Example 3: Knight Move
+3. White plays **Nf3**
+   - f3 is empty (non-capture) ✓
+   - Mirror of f3 is c6
+   - c6 is empty ✓
+   - **Result**: White knight on f3, Black knight appears on c6
+
+### Example 4: Capture
+4. White plays **exd5** (pawn captures on d5)
+   - This is a capture ✗
+   - **Result**: White pawn on d5, no mirror piece created
 
 ## Implementation
 
 ### Board Changes
 - Added bidirectional "mirror" direction links connecting each square to its mirror
-- All 64 squares have explicit mirror links defined
+- All 64 squares have explicit mirror links defined in the Board-Definitions section
 
 ### Movement Macros
 Modified the following movement definition macros to include mirror piece creation:
 
 1. **leap1, leap2** - Used by Knights for L-shaped moves
+   - Added: `(if empty? (mirror-piece))` before `add`
+   
 2. **king-shift** - Used by King for single-square moves
-3. **slide** - Used by Bishops and Queens for sliding moves
-4. **rook-slide** - Used by Rooks for sliding moves (with never-moved tracking)
-5. **Pawn-move** - Used by Pawns for forward movement
-6. **Pawn-add** - Used by Pawns for both moves and promotions
+   - Added: `(if empty? (mirror-piece))` before setting never-moved? and `add`
+   
+3. **slide** - Used by Bishops and Queens for sliding diagonal moves
+   - Added: `(mirror-piece)` in the while-empty loop
+   - Final capture move (after loop) doesn't call mirror-piece
+   
+4. **rook-slide** - Used by Rooks and Queens for sliding orthogonal moves
+   - Added: `(mirror-piece)` in the while-empty loop
+   - Preserves never-moved? attribute tracking
+   - Final capture move (after loop) doesn't call mirror-piece
+   
+5. **Pawn-move** - Used by Pawns for forward movement (1 or 2 squares)
+   - Modified Pawn-add to call mirror-piece for non-promotion moves
+   - Added mirror-piece for the 2-square move
+   
+6. **Pawn-capture** - Used by Pawns for diagonal captures
+   - Does NOT call mirror-piece (captures should not create mirrors)
+   - Handles promotion separately without mirror piece creation
 
 ### Technical Approach
-Each non-capture move now includes:
+The core mirror piece creation logic is defined as:
+
 ```lisp
-(if (empty? mirror) (create mirror) (flip mirror))
+(define mirror-piece (if (empty? mirror) (create mirror) (flip mirror)))
 ```
 
-This logic:
-1. Checks if the mirror square is empty
-2. If yes: Creates a piece on the mirror square and flips its ownership to the opponent
-3. If no: Does nothing (move proceeds normally)
+This macro:
+1. Checks if the mirror square is empty using `(empty? mirror)`
+2. If yes: Creates a piece on the mirror square with `(create mirror)` 
+3. Then flips its ownership to the opponent with `(flip mirror)`
+4. If no (mirror is occupied): Does nothing
+
+Each non-capture move includes this logic by:
+- Checking if the destination is empty: `(if empty? ...)`
+- Calling mirror-piece when destination is empty
+- Adding the move with `add`
 
 ### Known Limitations
-The ZRF language documentation states: "you should not count on a move being able to create a piece and then flip it" because the order of modifiers within the same priority level is not guaranteed.
 
-However, in practice, this implementation uses the `create` + `flip` pattern which:
-- Creates a copy of the moving piece on the mirror square (defaults to current player)
-- Flips the ownership to the opponent player
+**Modifier Order Dependency:**
+The ZRF language documentation states: "Within a level, the order is not guaranteed, e.g. you should not count on a move being able to create a piece and then flip it."
 
-If this approach doesn't work reliably in the Zillions of Games engine, an alternative implementation would require:
-- Removing the `symmetry` directive
-- Defining separate piece types and moves for White and Black
-- Using `(create Black mirror)` for White pieces and `(create White mirror)` for Black pieces
+This implementation uses the `(create mirror) (flip mirror)` pattern where:
+- `create` places a copy of the moving piece on the mirror square (defaults to current player)
+- `flip` changes the ownership to the opponent player (in a 2-player game)
 
-## Testing
-To test this variant:
-1. Load ChessLight.zrf in Zillions of Games
-2. Start a new game
-3. Make a non-capture move (e.g., e2-e4)
-4. Verify that an opponent pawn appears on the mirror square (d5 in this case)
-5. Verify that subsequent moves to occupied mirrors work normally
-6. Verify that captures don't create mirror pieces
+Both are priority level 2 modifiers that are queued and applied when the move is executed. If they are executed in order (create first, then flip), this works correctly. However, the documentation warns that the order is not guaranteed.
 
-## Example Game Start
-1. White plays e2-e4 → Black Pawn appears on d5
-2. Black plays d7-d5 → This square is already occupied, so no mirror piece (normal move)
-3. White plays Nf3 → Black Knight appears on c6
-4. etc.
+**If this approach fails**, an alternative implementation would require:
+1. Removing the `symmetry` directive
+2. Defining separate piece types for White and Black players
+3. Using `(create Black mirror)` for White pieces and `(create White mirror)` for Black pieces
+4. Duplicating all move definitions for each player
+
+## Testing Checklist
+
+To verify this implementation in Zillions of Games:
+
+- [ ] Load ChessLight.zrf successfully
+- [ ] Opening move e2-e4 creates Black pawn on d5
+- [ ] Move to occupied mirror (e.g., d7-d5 after e2-e4) works normally
+- [ ] Knight moves create mirror knights
+- [ ] Bishop slides create mirror bishops on each empty square
+- [ ] Rook slides create mirror rooks on each empty square  
+- [ ] Queen moves create mirror queens
+- [ ] King moves create mirror kings
+- [ ] Pawn two-square advance creates mirror pawn
+- [ ] Pawn captures do NOT create mirror pieces
+- [ ] En passant works and doesn't create mirror pieces
+- [ ] Castling works and doesn't create mirror pieces
+- [ ] Pawn promotion works correctly
+- [ ] Check and checkmate work normally
+- [ ] Mirror pieces are in opponent's color
+- [ ] Mirrors use correct 180-degree rotation
+
+## File Changes
+
+- **ChessLight.zrf**: Modified with mirror square implementation
+  - Added mirror-piece macro
+  - Modified leap1, leap2, king-shift, slide, rook-slide, Pawn-move, Pawn-add, Pawn-capture
+  - Added mirror direction links for all 64 squares
+  
+- **MIRROR_CHESS.md**: This documentation file
