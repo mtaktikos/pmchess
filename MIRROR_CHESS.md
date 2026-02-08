@@ -4,7 +4,7 @@
 This variant of chess implements a "mirror square" mechanic where non-capture moves can create opponent pieces on mirror positions.
 
 ## Mirror Square Definition
-A mirror square is clock-symmetric to the original square on an 8x8 board (180-degree rotation around the center):
+A mirror square is rotationally symmetric to the original square on an 8x8 board (180-degree rotation around the center):
 - **Formula**: Mirror of position (file, rank) = position (9-file, 9-rank)
 - **Examples**:
   - mirror(a1) = h8
