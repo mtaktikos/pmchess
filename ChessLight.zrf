@@ -12,9 +12,7 @@
 (define king-shift   ($1    (verify not-friend?) (if empty? (mirror-piece)) (set-attribute never-moved? false) add) )
 
 ; Mirror square helper: creates opponent piece on mirror if empty after non-capture move
-; For White pieces, creates Black piece; for Black pieces, creates White piece
-(define mirror-piece-white (if (empty? mirror) (create Black mirror)))
-(define mirror-piece-black (if (empty? mirror) (create White mirror)))
+(define mirror-piece (if (empty? mirror) (create mirror) (flip mirror)))
 
 (define slide        ($1 (while empty? (mirror-piece) add $1) (verify not-friend?) add))
 (define rook-slide (
