@@ -14,14 +14,24 @@ A mirror square is rotationally symmetric to the original square on an 8x8 board
   - mirror(d4) = e5
 
 ## Rules
-1. When a piece makes a **non-capture** move and lands on a square:
-   - **If the mirror square is occupied**: The move ends normally (standard chess)
-   - **If the mirror square is empty**: A piece of the same type in the **opponent's color** appears on the mirror square
+1.1. We define a function nachfolger, where
+nachfolger(PAWN) = KNIGHT;
+nachfolger(KNIGHT) = BiSHOP;
+nachfolger(BISHOP) = ROOK;
+nachfolger(ROOK) = QUEEN;
 
-2. All other chess rules remain unchanged:
-   - Castling works normally (but doesn't create mirror pieces)
+1.2 When a piece except King or Queen makes a **non-capture** move and lands on a square:
+   - **If the mirror square is occupied**: The move ends normally (standard chess)
+   - **If the mirror square is empty**: nachfolger(piece) in the **opponent's color** appears on the mirror square
+ 1.3 When a King or Queen makes a  **non-capture** move and lands on a square:
+   - **If the mirror square is occupied**: The move ends normally (standard chess)
+   - **If the mirror square is empty**: The King or Queen is transported to the mirror square 
+
+2. Other changed and unchanged chess rules:
+   - There is no castling
    - En passant works normally (doesn't create mirror pieces - it's a capture)
-   - Pawn promotion works normally
+   - Pawns promote normally: if they promote to Queen, then nothing in the mirror square is produced, since
+     nachfolger(Queen) doesn't exist; if they promote to another piece and the mirror square is empty, then there is nachfolger(piece) with opponent's colors created
    - Check and checkmate work normally
    - Capture moves do NOT create mirror pieces
 
@@ -32,7 +42,7 @@ A mirror square is rotationally symmetric to the original square on an 8x8 board
    - e2 is empty (non-capture) ✓
    - Mirror of e4 is d5
    - d5 is empty ✓  
-   - **Result**: White pawn on e4, Black pawn appears on d5
+   - **Result**: White pawn on e4, Black knight appears on d5
 
 ### Example 2: Mirror Occupied
 2. Black plays **d7-d5**
@@ -45,7 +55,7 @@ A mirror square is rotationally symmetric to the original square on an 8x8 board
    - f3 is empty (non-capture) ✓
    - Mirror of f3 is c6
    - c6 is empty ✓
-   - **Result**: White knight on f3, Black knight appears on c6
+   - **Result**: White knight on f3, Black Bishop appears on c6
 
 ### Example 4: Capture
 4. White plays **exd5** (pawn captures on d5)
@@ -58,54 +68,7 @@ A mirror square is rotationally symmetric to the original square on an 8x8 board
 - Added bidirectional "mirror" direction links connecting each square to its mirror
 - All 64 squares have explicit mirror links defined in the Board-Definitions section
 
-### Movement Macros
-Modified the following movement definition macros to include mirror piece creation:
-
-1. **leap1, leap2** - Used by Knights for L-shaped moves
-   - Added: `(if empty? (mirror-piece))` before `add`
-   
-2. **king-shift** - Used by King for single-square moves
-   - Added: `(if empty? (mirror-piece))` before setting never-moved? and `add`
-   
-3. **slide** - Used by Bishops and Queens for sliding diagonal moves
-   - Added: `(mirror-piece)` in the while-empty loop
-   - Final capture move (after loop) doesn't call mirror-piece
-   
-4. **rook-slide** - Used by Rooks and Queens for sliding orthogonal moves
-   - Added: `(mirror-piece)` in the while-empty loop
-   - Preserves never-moved? attribute tracking
-   - Final capture move (after loop) doesn't call mirror-piece
-   
-5. **Pawn-move** - Used by Pawns for forward movement (1 or 2 squares)
-   - Modified Pawn-add to call mirror-piece for non-promotion moves
-   - Added mirror-piece for the 2-square move
-   
-6. **Pawn-capture** - Used by Pawns for diagonal captures
-   - Does NOT call mirror-piece (captures should not create mirrors)
-   - Handles promotion separately without mirror piece creation
-
-### Technical Approach
-The core mirror piece creation logic is defined as:
-
-```lisp
-(define mirror-piece (if (empty? mirror) (create mirror) (flip mirror)))
-```
-
-This macro:
-1. Checks if the mirror square is empty using `(empty? mirror)`
-2. If yes: Creates a piece on the mirror square with `(create mirror)` 
-3. Then flips its ownership to the opponent with `(flip mirror)`
-4. If no (mirror is occupied): Does nothing
-
-Each non-capture move includes this logic by:
-- Checking if the destination is empty: `(if empty? ...)`
-- Calling mirror-piece when destination is empty
-- Adding the move with `add`
-
-### Known Limitations
-
-**Modifier Order Dependency:**
-The ZRF language documentation states: "Within a level, the order is not guaranteed, e.g. you should not count on a move being able to create a piece and then flip it."
+and then flip it."
 
 This implementation uses the `(create mirror) (flip mirror)` pattern where:
 - `create` places a copy of the moving piece on the mirror square (defaults to current player)
