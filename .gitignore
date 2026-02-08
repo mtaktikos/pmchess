@@ -6,3 +6,6 @@ tscp
 test_mirror.txt
 test2.txt
 comprehensive_test.txt
+simple_demo.txt
+verify_fix.txt
+test_all_rules.sh
