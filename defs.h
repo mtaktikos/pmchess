@@ -91,4 +91,6 @@ typedef struct {
 	int ep;
 	int fifty;
 	int hash;
+	int mirror_square;  /* square where mirror piece was placed, or -1 if none */
+	int mirror_piece;   /* piece type placed on mirror square, or -1 if none */
 } hist_t;
