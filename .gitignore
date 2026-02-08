@@ -1,0 +1,8 @@
+# Build artifacts
+*.o
+tscp
+
+# Test files  
+test_mirror.txt
+test2.txt
+comprehensive_test.txt
