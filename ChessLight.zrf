@@ -7,14 +7,19 @@
 
 (version "2.0")
 
-(define leap1        ($1    (verify not-friend?) add) )
-(define leap2        ($1 $2 (verify not-friend?) add) )
-(define king-shift   ($1    (verify not-friend?) (set-attribute never-moved? false) add) )
+(define leap1        ($1    (verify not-friend?) (if empty? (mirror-piece)) add) )
+(define leap2        ($1 $2 (verify not-friend?) (if empty? (mirror-piece)) add) )
+(define king-shift   ($1    (verify not-friend?) (if empty? (mirror-piece)) (set-attribute never-moved? false) add) )
 
-(define slide        ($1 (while empty? add $1) (verify not-friend?) add))
+; Mirror square helper: creates opponent piece on mirror if empty after non-capture move
+; For White pieces, creates Black piece; for Black pieces, creates White piece
+(define mirror-piece-white (if (empty? mirror) (create Black mirror)))
+(define mirror-piece-black (if (empty? mirror) (create White mirror)))
+
+(define slide        ($1 (while empty? (mirror-piece) add $1) (verify not-friend?) add))
 (define rook-slide (
   $1
-  (while empty? (set-attribute never-moved? false) add $1)
+  (while empty? (set-attribute never-moved? false) (mirror-piece) add $1)
   (verify not-friend?)
   (set-attribute never-moved? false)
   add
@@ -74,7 +79,7 @@
      )
 )
 (define Pawn-add
-   (if (in-zone? promotion-zone) (add Knight Bishop Rook Queen) else add)
+   (if (in-zone? promotion-zone) (add Knight Bishop Rook Queen) else (mirror-piece) add)
 )
 (define Pawn-move
    (
@@ -84,6 +89,7 @@
       (verify (in-zone? third-rank))
       n
       (verify empty?)
+      (mirror-piece)
       add
    )
 )
@@ -122,6 +128,17 @@
      )
   )
   (symmetry Black (n s)(s n) (nw sw)(sw nw) (ne se)(se ne))
+  ; Mirror square links - each square links to its clock-symmetric mirror
+  (links mirror 
+     (a1 h8) (a2 g8) (a3 f8) (a4 e8) (a5 d8) (a6 c8) (a7 b8) (a8 a8)
+     (b1 h7) (b2 g7) (b3 f7) (b4 e7) (b5 d7) (b6 c7) (b7 b7) (b8 a7)
+     (c1 h6) (c2 g6) (c3 f6) (c4 e6) (c5 d6) (c6 c6) (c7 b6) (c8 a6)
+     (d1 h5) (d2 g5) (d3 f5) (d4 e5) (d5 d5) (d6 c5) (d7 b5) (d8 a5)
+     (e1 h4) (e2 g4) (e3 f4) (e4 e4) (e5 d4) (e6 c4) (e7 b4) (e8 a4)
+     (f1 h3) (f2 g3) (f3 f3) (f4 e3) (f5 d3) (f6 c3) (f7 b3) (f8 a3)
+     (g1 h2) (g2 g2) (g3 f2) (g4 e2) (g5 d2) (g6 c2) (g7 b2) (g8 a2)
+     (h1 h1) (h2 g1) (h3 f1) (h4 e1) (h5 d1) (h6 c1) (h7 b1) (h8 a1)
+  )
   (zone
      (name promotion-zone)
      (players White)
