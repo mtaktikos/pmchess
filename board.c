@@ -552,22 +552,24 @@ BOOL makemove(move_bytes m)
 			}
 			else {
 				/* Other pieces: create successor piece in opponent's color */
-				int succ = successor_piece(moved_piece);
+				int succ;
+				
+				/* Handle pawn promotion case */
+				if (m.bits & 32) {
+					/* Promotion: use the promoted piece to determine successor */
+					succ = successor_piece(m.promote);
+				}
+				else {
+					succ = successor_piece(moved_piece);
+				}
+				
 				if (succ != -1) {
-					/* Handle pawn promotion case */
-					if (m.bits & 32) {
-						/* Promotion: use the promoted piece to determine successor */
-						succ = successor_piece(m.promote);
-					}
+					color[mir_sq] = xside;
+					piece[mir_sq] = succ;
 					
-					if (succ != -1) {
-						color[mir_sq] = xside;
-						piece[mir_sq] = succ;
-						
-						/* Track for takeback */
-						hist_dat[hply - 1].mirror_square = mir_sq;
-						hist_dat[hply - 1].mirror_piece = succ;
-					}
+					/* Track for takeback */
+					hist_dat[hply - 1].mirror_square = mir_sq;
+					hist_dat[hply - 1].mirror_piece = succ;
 				}
 			}
 		}
