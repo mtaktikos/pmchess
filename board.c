@@ -12,6 +12,31 @@
 #include "protos.h"
 
 
+/* Mirror chess helper functions */
+
+/* Calculate the mirror square (180-degree rotation around board center) */
+int mirror_square(int sq)
+{
+	return 63 - sq;
+}
+
+/* Get the successor piece according to mirror chess rules:
+   PAWN -> KNIGHT, KNIGHT -> BISHOP, BISHOP -> ROOK, ROOK -> QUEEN
+   QUEEN and KING return -1 (no successor) */
+int successor_piece(int piece_type)
+{
+	switch (piece_type) {
+		case PAWN:   return KNIGHT;
+		case KNIGHT: return BISHOP;
+		case BISHOP: return ROOK;
+		case ROOK:   return QUEEN;
+		case QUEEN:  return -1;  /* No successor */
+		case KING:   return -1;  /* No successor */
+		default:     return -1;
+	}
+}
+
+
  /* init_board() sets the board to the initial game state. */
 
 void init_board()
@@ -24,7 +49,7 @@ void init_board()
 	}
 	side = LIGHT;
 	xside = DARK;
-	castle = 15;
+	castle = 0;  /* Mirror chess: no castling allowed */
 	ep = -1;
 	fifty = 0;
 	ply = 0;
@@ -464,6 +489,8 @@ BOOL makemove(move_bytes m)
 	hist_dat[hply].ep = ep;
 	hist_dat[hply].fifty = fifty;
 	hist_dat[hply].hash = hash;
+	hist_dat[hply].mirror_square = -1;  /* Initialize: no mirror piece placed */
+	hist_dat[hply].mirror_piece = -1;
 	++ply;
 	++hply;
 
@@ -501,6 +528,50 @@ BOOL makemove(move_bytes m)
 		else {
 			color[m.to - 8] = EMPTY;
 			piece[m.to - 8] = EMPTY;
+		}
+	}
+
+	/* Mirror Chess: Handle mirror square mechanics for non-capture moves */
+	if (!(m.bits & 1)) {  /* Non-capture move */
+		int mir_sq = mirror_square((int)m.to);
+		int moved_piece = piece[(int)m.to];
+		
+		/* Check if mirror square is empty */
+		if (color[mir_sq] == EMPTY) {
+			/* King and Queen: teleport to mirror square */
+			if (moved_piece == KING || moved_piece == QUEEN) {
+				/* Move the piece to mirror square */
+				color[mir_sq] = side;
+				piece[mir_sq] = moved_piece;
+				color[(int)m.to] = EMPTY;
+				piece[(int)m.to] = EMPTY;
+				
+				/* Track for takeback */
+				hist_dat[hply - 1].mirror_square = mir_sq;
+				hist_dat[hply - 1].mirror_piece = -2;  /* Special flag for teleportation */
+			}
+			else {
+				/* Other pieces: create successor piece in opponent's color */
+				int succ;
+				
+				/* Handle pawn promotion case */
+				if (m.bits & 32) {
+					/* Promotion: use the promoted piece to determine successor */
+					succ = successor_piece(m.promote);
+				}
+				else {
+					succ = successor_piece(moved_piece);
+				}
+				
+				if (succ != -1) {
+					color[mir_sq] = xside;
+					piece[mir_sq] = succ;
+					
+					/* Track for takeback */
+					hist_dat[hply - 1].mirror_square = mir_sq;
+					hist_dat[hply - 1].mirror_piece = succ;
+				}
+			}
 		}
 	}
 
@@ -584,6 +655,25 @@ void takeback()
 		else {
 			color[m.to - 8] = xside;
 			piece[m.to - 8] = PAWN;
+		}
+	}
+
+	/* Mirror Chess: Restore board state for mirror mechanics */
+	if (hist_dat[hply].mirror_square != -1) {
+		int mir_sq = hist_dat[hply].mirror_square;
+		
+		if (hist_dat[hply].mirror_piece == -2) {
+			/* This was a King/Queen teleportation */
+			/* The piece is currently at mir_sq, move it back to m.to */
+			color[(int)m.to] = side;
+			piece[(int)m.to] = piece[mir_sq];
+			color[mir_sq] = EMPTY;
+			piece[mir_sq] = EMPTY;
+		}
+		else {
+			/* This was a normal mirror piece creation - remove it */
+			color[mir_sq] = EMPTY;
+			piece[mir_sq] = EMPTY;
 		}
 	}
 }
