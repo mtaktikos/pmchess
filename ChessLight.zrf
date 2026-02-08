@@ -76,8 +76,11 @@
        add
      )
 )
+(define Pawn-add-promotion
+   (add Knight Bishop Rook Queen)
+)
 (define Pawn-add
-   (if (in-zone? promotion-zone) (add Knight Bishop Rook Queen) else (mirror-piece) add)
+   (if (in-zone? promotion-zone) (Pawn-add-promotion) else (mirror-piece) add)
 )
 (define Pawn-move
    (
@@ -95,7 +98,7 @@
    (
       $1
       (verify enemy?)
-      (Pawn-add)
+      (if (in-zone? promotion-zone) (Pawn-add-promotion) else add)
    )
 )
 (define En-Passant
